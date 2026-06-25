@@ -10,7 +10,7 @@ description: 当用户想搜索、安装、更新或管理 SkillFlux 精选 skil
 1. 调用 `auth.status` 检查当前设备授权状态。
 2. 如果返回 `unauthenticated`，调用 `auth.start`，把登录链接交给用户。
 3. 用户完成浏览器登录后，再调用 `auth.status`。
-4. 如果返回 `needs_payment`：SkillFlux 是**订阅制**，先问用户要 **monthly 还是 annual**，再用对应 `plan` 调用 `billing.checkout`，把支付链接交给用户。此状态下仍可安装 **free tier** skills；deluxe 需订阅生效后再 `auth.status`。订阅到期或取消后 deluxe 访问会自动失效。
+4. **当前为免费公测**：登录成功后 `auth.status` 即返回 `active`，全部 skill(含 deluxe)免费解锁，**无需付费**。正常情况下不会出现 `needs_payment`；若出现，说明公测开关已关闭(进入收费模式)，此时再按订阅流程(monthly/annual)调用 `billing.checkout`。
 5. 如果返回 `active` 或 `needs_payment`（仅 free skills），根据用户意图调用 `pack.search`、`pack.info`、`skill.install`、`skill.update`、`skill.list`、`skill.remove`、`skill.restore` 或 `doctor`。
 6. 精选 skill **始终安装到当前项目**的 `.skillflux/skills/`（project scope）。没有"全局安装 skill"这一说；`skill.install` 不接受 scope 参数。user/global 概念只用于 SkillFlux 自身的 bootstrap（CLI、MCP 配置、manager skill）。
 7. 安装或更新完成后，总结本项目已启用的 skills（`skillflux.json` + lockfile），并提示用户刷新 agent 会话。

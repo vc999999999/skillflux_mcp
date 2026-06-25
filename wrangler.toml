@@ -14,6 +14,12 @@ database_id = "00000000-0000-0000-0000-000000000001"
 SITE_URL = "https://skillflux.cn"
 SKILLFLUX_PRODUCT = "deluxe-pack"
 
+# FREE PUBLIC BETA (this branch): any logged-in user unlocks all skills without
+# payment. Login (GitHub OAuth) is still required, so beta users are real
+# accounts. To start charging: set SKILLFLUX_FREE_BETA = "0" (or remove it),
+# configure STRIPE_PRICE_MONTHLY / STRIPE_PRICE_ANNUAL, and deploy main.
+SKILLFLUX_FREE_BETA = "1"
+
 # IMPORTANT: do NOT set SKILLFLUX_FIXTURE_MODE here. Fixture mode is a
 # development bypass that grants paid access without real SSO/payment. It is
 # gated by both the flag AND a non-production host (see functions/lib/fixture.ts),

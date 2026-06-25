@@ -35,7 +35,7 @@ export interface PackCatalog {
 
 export interface AuthContext {
   userId: string;
-  plan: "free" | "lifetime" | "annual" | "monthly" | "fixture";
+  plan: "free" | "lifetime" | "annual" | "monthly" | "fixture" | "beta";
   tiers: string[];
 }
 

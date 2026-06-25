@@ -7,6 +7,7 @@ import {
   hasDeluxeAccess,
 } from "./entitlements-db.js";
 import { isFixtureEnabled } from "./fixture.js";
+import { freeBetaAuthContext, isFreeBeta } from "./entitlement.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
   getDeviceByTokenHash,
@@ -89,6 +90,10 @@ export async function authenticate(request: Request, env: Env): Promise<AuthCont
   }
 
   await touchDevice(env.DB, device.id);
+  // Free beta: a valid login is enough to unlock everything (no payment).
+  if (isFreeBeta(env)) {
+    return freeBetaAuthContext(device.user_id);
+  }
   const entitlement = await getActiveEntitlement(env.DB, device.user_id, productId(env));
   return authContextFromEntitlement(device.user_id, entitlement);
 }
@@ -110,6 +115,9 @@ export async function resolveDeviceStatus(
     const device = await getDeviceByTokenHash(env.DB, tokenHash);
     if (!device) {
       return { status: "unauthenticated", message: "Invalid device token." };
+    }
+    if (isFreeBeta(env)) {
+      return { status: "active", plan: "beta", message: "Free beta — all skills unlocked." };
     }
     const entitlement = await getActiveEntitlement(env.DB, device.user_id, productId(env));
     const auth = authContextFromEntitlement(device.user_id, entitlement);
@@ -157,9 +165,20 @@ export async function resolveDeviceStatus(
     };
   }
 
+  const issued = await issueDeviceForSession(env.DB, session);
+
+  // Free beta: completing login is enough — issue the token and unlock all.
+  if (isFreeBeta(env)) {
+    return {
+      status: "active",
+      plan: "beta",
+      deviceToken: issued.token,
+      message: "Free beta — all skills unlocked.",
+    };
+  }
+
   const entitlement = await getActiveEntitlement(env.DB, session.user_id, productId(env));
   const auth = authContextFromEntitlement(session.user_id, entitlement);
-  const issued = await issueDeviceForSession(env.DB, session);
 
   if (!hasDeluxeAccess(auth)) {
     return {

@@ -1,6 +1,9 @@
 interface Env {
   DB: D1Database;
   SKILLFLUX_FIXTURE_MODE?: string;
+  // Free public beta: when "1", any logged-in user gets full (deluxe) access
+  // without payment. Flip to off + configure Stripe prices to start charging.
+  SKILLFLUX_FREE_BETA?: string;
   SKILLFLUX_API_DEV_TOKEN?: string;
   SITE_URL?: string;
   GITHUB_CLIENT_ID?: string;

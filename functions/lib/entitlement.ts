@@ -2,6 +2,7 @@ import type { AuthContext } from "./catalog";
 
 export function tiersForPlan(plan: AuthContext["plan"]): string[] {
   switch (plan) {
+    case "beta":
     case "fixture":
     case "lifetime":
     case "annual":
@@ -12,6 +13,15 @@ export function tiersForPlan(plan: AuthContext["plan"]): string[] {
     default:
       return ["free"];
   }
+}
+
+/** Free public beta: any logged-in user gets full access without payment. */
+export function isFreeBeta(env: Env): boolean {
+  return env.SKILLFLUX_FREE_BETA === "1";
+}
+
+export function freeBetaAuthContext(userId: string): AuthContext {
+  return { userId, plan: "beta", tiers: ["free", "deluxe"] };
 }
 
 export function canAccessSkill(auth: AuthContext, tier: string): boolean {

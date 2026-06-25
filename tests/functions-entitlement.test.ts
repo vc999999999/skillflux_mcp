@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { canAccessSkill, expiresAtForPlan, tiersForPlan } from "../functions/lib/entitlement";
-import { pickActiveEntitlement, type EntitlementRow } from "../functions/lib/entitlements-db";
+import {
+  canAccessSkill,
+  expiresAtForPlan,
+  freeBetaAuthContext,
+  isFreeBeta,
+  tiersForPlan,
+} from "../functions/lib/entitlement";
+import {
+  hasDeluxeAccess,
+  pickActiveEntitlement,
+  type EntitlementRow,
+} from "../functions/lib/entitlements-db";
 
 describe("registry entitlement", () => {
   it("lifetime plan includes deluxe tier", () => {
@@ -72,5 +82,21 @@ describe("entitlement expiry", () => {
     expect(expiresAtForPlan("monthly", from)).toBe("2026-07-25T00:00:00.000Z");
     expect(expiresAtForPlan("annual", from)).toBe("2027-06-25T00:00:00.000Z");
     expect(expiresAtForPlan("lifetime", from)).toBeNull();
+  });
+});
+
+describe("free beta", () => {
+  it("beta plan unlocks deluxe without any entitlement", () => {
+    const auth = freeBetaAuthContext("u1");
+    expect(auth.plan).toBe("beta");
+    expect(tiersForPlan("beta")).toContain("deluxe");
+    expect(hasDeluxeAccess(auth)).toBe(true);
+    expect(canAccessSkill(auth, "deluxe")).toBe(true);
+  });
+
+  it("isFreeBeta reads the env flag", () => {
+    expect(isFreeBeta({ SKILLFLUX_FREE_BETA: "1" } as unknown as Env)).toBe(true);
+    expect(isFreeBeta({ SKILLFLUX_FREE_BETA: "0" } as unknown as Env)).toBe(false);
+    expect(isFreeBeta({} as unknown as Env)).toBe(false);
   });
 });

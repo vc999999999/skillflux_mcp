@@ -24,12 +24,9 @@ description: 当用户想搜索、安装、更新或管理 SkillFlux 精选 skil
 - 不要替用户在 agent 内完成登录或支付；只提供浏览器链接。
 - 不要保存 token，不要直接拼 API 请求；所有操作通过 MCP 工具完成。
 
-## P0 Fixture 模式
+## 运行模式
 
-未设置 `SKILLFLUX_API_URL` 时（本地沙盒）：
-
-- `auth.status` 返回 `active`
-- **仅能安装 free tier skills**（如 bundled `demo-skill`）验证链路
-- deluxe skills 不在 npm 包内、也不会被 fixture 解锁；需设置 `SKILLFLUX_API_URL` 接入正式 registry 并完成购买后才能安装
+- **默认连接正式 registry**（`https://skillflux.cn/api`，或 `SKILLFLUX_API_URL`）。用户需登录后按授权使用。
+- **本地开发沙盒**：设置 `SKILLFLUX_FIXTURE=1` 时 `auth.status` 返回 `active`，**仅能安装 free tier skills**（如 bundled `demo-skill`）验证链路；deluxe skills 不在 npm 包内、也不会被 fixture 解锁。
 
 安装命令：`npx -y skillflux install`

@@ -119,6 +119,8 @@ describe("restore project skills", () => {
   it("installs skills declared in skillflux.json", async () => {
     const base = await mkdtemp(join(tmpdir(), "skillflux-restore-"));
     const originalCwd = process.cwd();
+    const savedFixture = process.env.SKILLFLUX_FIXTURE;
+    process.env.SKILLFLUX_FIXTURE = "1";
 
     try {
       process.chdir(base);
@@ -148,6 +150,8 @@ describe("restore project skills", () => {
     } finally {
       process.chdir(originalCwd);
       await rm(base, { recursive: true, force: true });
+      if (savedFixture === undefined) delete process.env.SKILLFLUX_FIXTURE;
+      else process.env.SKILLFLUX_FIXTURE = savedFixture;
     }
   });
 });

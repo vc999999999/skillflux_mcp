@@ -56,10 +56,11 @@ export async function getOrCreateDeviceId(agent: AgentId): Promise<SkillFluxConf
 }
 
 export function isFixtureMode(): boolean {
-  if (process.env.SKILLFLUX_FIXTURE === "0") return false;
-  if (process.env.SKILLFLUX_FIXTURE === "1") return true;
-  if (process.env.SKILLFLUX_API_URL) return false;
-  return true;
+  // Production is the default: the client talks to the real registry at
+  // apiBaseUrl(). Fixture mode is an explicit local-dev opt-in
+  // (SKILLFLUX_FIXTURE=1), so a published install connects to the live API
+  // and goes through login instead of silently running offline.
+  return process.env.SKILLFLUX_FIXTURE === "1";
 }
 
 export function apiBaseUrl(): string {

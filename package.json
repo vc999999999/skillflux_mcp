@@ -1,0 +1,21 @@
+{
+  "name": "skillflux-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "sync:pack": "cd skillflux-pack && npm run sync:hash && npm run validate:pack && cd .. && node scripts/sync-pack-to-functions.mjs",
+    "build:pack": "cd skillflux-pack && npm install && npm run build",
+    "build": "npm run sync:pack && npm run build:pack",
+    "db:migrate:local": "wrangler d1 execute skillflux --local --file=./migrations/0001_init.sql",
+    "pages:dev": "npm run sync:pack && wrangler pages dev public"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250625.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.104.0"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+.DS_Store
+*.log
+
+# Generated registry bundle (rebuilt via npm run sync:pack)
+functions/_pack/catalog.json
+
+.env
+.env.*
+!.env.example

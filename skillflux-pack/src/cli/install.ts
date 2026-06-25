@@ -1,5 +1,5 @@
 import { access } from "node:fs/promises";
-import { getOrCreateDeviceId, isFixtureMode, writeConfig } from "../lib/config.js";
+import { apiBaseUrl, getOrCreateDeviceId, isFixtureMode, writeConfig } from "../lib/config.js";
 import { projectManifestPath } from "../lib/project.js";
 import {
   ensureCacheDir,
@@ -52,8 +52,10 @@ export async function runInstall(options: InstallOptions = {}): Promise<InstallR
   notes.push("Project skills install to ./.skillflux/skills/ and update ./skillflux.json.");
 
   if (config.fixtureMode) {
-    notes.push("Fixture mode enabled — auth.status returns active for local P0 testing.");
-    notes.push("Set SKILLFLUX_API_URL to use production API when ready.");
+    notes.push("Fixture mode (SKILLFLUX_FIXTURE=1) — local offline sandbox, free skills only.");
+  } else {
+    notes.push(`Connected to SkillFlux registry: ${apiBaseUrl()}`);
+    notes.push("First use will prompt a browser login (auth.start).");
   }
 
   notes.push("Restart your agent session, then ask it to install skills for this project.");

@@ -8,6 +8,8 @@ directory = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "skillflux"
+# Placeholder — replace with the real id from `wrangler d1 create skillflux`
+# before deploying. See DEPLOY.md.
 database_id = "00000000-0000-0000-0000-000000000001"
 
 [vars]

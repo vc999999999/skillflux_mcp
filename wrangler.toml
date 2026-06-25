@@ -13,9 +13,17 @@ database_id = "00000000-0000-0000-0000-000000000001"
 [vars]
 SITE_URL = "https://skillflux.cn"
 SKILLFLUX_PRODUCT = "deluxe-pack"
-SKILLFLUX_FIXTURE_MODE = "1"
+
+# IMPORTANT: do NOT set SKILLFLUX_FIXTURE_MODE here. Fixture mode is a
+# development bypass that grants paid access without real SSO/payment. It is
+# gated by both the flag AND a non-production host (see functions/lib/fixture.ts),
+# so even if this flag leaked into production it would be refused on skillflux.cn.
+# To enable it locally, put SKILLFLUX_FIXTURE_MODE = "1" in `.dev.vars`
+# (git-ignored) or pass it to `wrangler pages dev`. Never enable it for the
+# production deployment.
 
 # Secrets (set via `wrangler secret put` in production):
 # GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
-# STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
+# STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+# STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL  (recurring subscription Price ids)
 # SKILLFLUX_API_DEV_TOKEN

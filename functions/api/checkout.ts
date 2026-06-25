@@ -1,5 +1,7 @@
 import { authenticate, json, parseBearerToken } from "../lib/auth.js";
-import { createStripeCheckout } from "../lib/stripe.js";
+import { isFixtureEnabled } from "../lib/fixture.js";
+import { createStripeCheckout, isStripeConfigured } from "../lib/stripe.js";
+import type { SubscriptionPlan } from "../lib/subscription.js";
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const token = parseBearerToken(context.request);
@@ -10,7 +12,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await authenticate(context.request, context.env);
   if (auth instanceof Response) return auth;
 
-  let body: { product?: string } = {};
+  let body: { product?: string; plan?: string } = {};
   try {
     body = (await context.request.json()) as typeof body;
   } catch {
@@ -18,14 +20,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   const product = body.product ?? context.env.SKILLFLUX_PRODUCT ?? "deluxe-pack";
+  const plan: SubscriptionPlan = body.plan === "annual" ? "annual" : "monthly";
+  if (body.plan && body.plan !== "monthly" && body.plan !== "annual") {
+    return json(
+      { ok: false, code: "INVALID_INPUT", message: "plan must be 'monthly' or 'annual'." },
+      400,
+    );
+  }
 
   try {
-    if (context.env.STRIPE_SECRET_KEY && context.env.STRIPE_PRICE_ID) {
-      const checkout = await createStripeCheckout(context.env, context.request, auth.userId, product);
+    if (isStripeConfigured(context.env, plan)) {
+      const checkout = await createStripeCheckout(context.env, context.request, auth.userId, product, plan);
       return json({
         ok: true,
-        message: "Stripe checkout session created.",
-        data: { checkoutUrl: checkout.checkoutUrl },
+        message: `Stripe ${plan} subscription checkout session created.`,
+        data: { checkoutUrl: checkout.checkoutUrl, plan },
       });
     }
   } catch (error) {
@@ -39,7 +48,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     );
   }
 
-  if (context.env.SKILLFLUX_FIXTURE_MODE === "1") {
+  if (isFixtureEnabled(context.env, context.request)) {
     const origin = new URL(context.request.url).origin;
     return json({
       ok: true,

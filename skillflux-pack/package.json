@@ -10,18 +10,20 @@
   "files": [
     "dist",
     "bootstrap",
-    "skills",
+    "skills/demo-skill",
+    "skills/user-story-writer",
     "pack.json"
   ],
   "scripts": {
     "build": "node scripts/sync-pack-hash.mjs && tsc",
     "sync:hash": "node scripts/sync-pack-hash.mjs",
     "validate:pack": "node scripts/validate-pack.mjs",
+    "check:publish": "node scripts/check-publish-safety.mjs",
     "dev": "tsx src/bin/skillflux.ts",
     "dev:mcp": "tsx src/bin/skillflux-mcp.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run sync:hash && npm run validate:pack && npm run build"
+    "prepublishOnly": "npm run sync:hash && npm run validate:pack && npm run check:publish && npm run build"
   },
   "engines": {
     "node": ">=20"

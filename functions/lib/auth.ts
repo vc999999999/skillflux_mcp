@@ -6,6 +6,7 @@ import {
   getActiveEntitlement,
   hasDeluxeAccess,
 } from "./entitlements-db.js";
+import { isFixtureEnabled } from "./fixture.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
   getDeviceByTokenHash,
@@ -76,7 +77,7 @@ export async function authenticate(request: Request, env: Env): Promise<AuthCont
     return { userId: "dev-user", plan: "lifetime", tiers: ["free", "deluxe"] };
   }
 
-  if (env.SKILLFLUX_FIXTURE_MODE === "1" && (token === "fixture-dev-token" || token.startsWith("sfx_fixture_"))) {
+  if (isFixtureEnabled(env, request) && (token === "fixture-dev-token" || token.startsWith("sfx_fixture_"))) {
     return { userId: "fixture-user", plan: "lifetime", tiers: ["free", "deluxe"] };
   }
 
@@ -94,7 +95,7 @@ export async function authenticate(request: Request, env: Env): Promise<AuthCont
 
 export async function resolveDeviceStatus(
   env: Env,
-  input: { deviceSessionId?: string; bearerToken?: string | null },
+  input: { deviceSessionId?: string; bearerToken?: string | null; request?: Request },
 ): Promise<{
   status: "unauthenticated" | "pending" | "needs_payment" | "active" | "expired";
   plan?: string;
@@ -122,7 +123,7 @@ export async function resolveDeviceStatus(
     return { status: "active", plan: auth.plan, message: "Device authorized." };
   }
 
-  if (env.SKILLFLUX_FIXTURE_MODE === "1" && input.deviceSessionId) {
+  if (isFixtureEnabled(env, input.request) && input.deviceSessionId) {
     const fixture = authFromFixtureSession(input.deviceSessionId);
     if (fixture) {
       return {

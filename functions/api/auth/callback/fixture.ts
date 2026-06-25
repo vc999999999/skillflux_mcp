@@ -1,10 +1,11 @@
-import { grantEntitlement } from "../../../lib/entitlements-db.js";
+import { getEntitlementByOrderId, grantEntitlement } from "../../../lib/entitlements-db.js";
 import { bindUserToSession, getDeviceSessionById, sessionExpired, markSessionExpired } from "../../../lib/sessions.js";
 import { upsertFixtureUser } from "../../../lib/users.js";
+import { isFixtureEnabled } from "../../../lib/fixture.js";
 import { siteUrl } from "../../../lib/oauth-github.js";
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  if (context.env.SKILLFLUX_FIXTURE_MODE !== "1") {
+  if (!isFixtureEnabled(context.env, context.request)) {
     return new Response("Fixture auth disabled.", { status: 404 });
   }
 
@@ -28,13 +29,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const product = context.env.SKILLFLUX_PRODUCT ?? "deluxe-pack";
   const grantFixture = new URL(context.request.url).searchParams.get("purchase") === "1";
   if (grantFixture) {
-    await grantEntitlement(context.env.DB, {
-      userId: user.id,
-      product,
-      plan: "lifetime",
-      source: "fixture",
-      orderId: "fixture-order",
-    });
+    const orderId = `fixture-${user.id}`;
+    const existing = await getEntitlementByOrderId(context.env.DB, orderId);
+    if (!existing) {
+      await grantEntitlement(context.env.DB, {
+        userId: user.id,
+        product,
+        plan: "lifetime",
+        source: "fixture",
+        orderId,
+      });
+    }
   }
 
   const origin = siteUrl(context.env, context.request);

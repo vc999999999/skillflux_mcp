@@ -10,3 +10,7 @@ functions/_pack/catalog.json
 .env
 .env.*
 !.env.example
+
+# Local-only wrangler dev vars (may contain SKILLFLUX_FIXTURE_MODE etc.)
+.dev.vars
+.dev.vars.*

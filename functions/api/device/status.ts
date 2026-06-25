@@ -14,6 +14,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const status = await resolveDeviceStatus(context.env, {
     deviceSessionId: body.deviceSessionId,
     bearerToken: bearer,
+    request: context.request,
   });
 
   return json({

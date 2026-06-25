@@ -1,6 +1,6 @@
 # SkillFlux 精选 Skill 市场 PRD / Technical Spec
 
-- 状态：草稿 v0.3
+- 状态：草稿 v0.4
 - 日期：2026-06-25
 - 读者：构建本产品的开发者（你）
 - 关联：独立仓库 [skillflux_mcp](https://github.com/vc999999999/skillflux_mcp)；引流站 [Skillflux_Cloudflare](https://github.com/vc999999999/Skillflux_Cloudflare) 仅负责 skillflux.cn 内容分发
@@ -552,13 +552,20 @@ Remove behavior:
 
 ### Restore
 
-Future command:
+Command (implemented):
 
 ```bash
-skillflux install
+skillflux restore
 ```
 
-When run inside a project with `skillflux.json`, it should restore all declared project skills.
+When run inside a project with `skillflux.json`, it installs all declared
+project skills. For reproducibility it pins each skill to the version recorded
+in the committed lockfile (`.skillflux/installed.json`) when present, falling
+back to the latest catalog version otherwise. `skillflux install` also auto-runs
+restore when it detects a `skillflux.json` in the current directory.
+
+For reproducible clones, commit `skillflux.json` and `.skillflux/installed.json`
+and git-ignore `.skillflux/skills/` (see Open Decision #3).
 
 ---
 
@@ -586,22 +593,36 @@ Device flow:
 
 ### Payment Model
 
-No custom payment form in MVP.
+**Pricing = subscription** (decided 2026-06-25, resolves Open Decision #6).
+No custom payment form. Provider: **Stripe Checkout in `subscription` mode**.
 
-Supported options:
-- Stripe Checkout.
-- Lemon Squeezy.
-- Polar.
-- Domestic provider later if needed.
+Plans:
+- `monthly` → `STRIPE_PRICE_MONTHLY`
+- `annual` → `STRIPE_PRICE_ANNUAL`
+- No free trial. (`free` tier skills are installable without paying; `lifetime`
+  remains only as an internal/admin/fixture grant, not sold.)
 
-Payment flow:
+Checkout flow:
 
 1. MCP detects `needs_payment`.
-2. MCP calls `billing.checkout`.
-3. API returns hosted checkout URL.
-4. User pays in browser.
-5. Webhook writes entitlement.
+2. Manager skill asks the user monthly vs annual, then calls
+   `billing.checkout({ plan })`.
+3. API creates a Stripe `subscription` checkout for the matching price and
+   returns the hosted URL.
+4. User subscribes in the browser.
+5. Subscription lifecycle webhooks write/refresh entitlement.
 6. MCP sees `active`.
+
+Subscription lifecycle (webhook `/api/webhooks/payment/stripe`):
+- `checkout.session.completed` — fast-path activation (insert-only, keyed by the
+  Stripe subscription id).
+- `customer.subscription.created` / `customer.subscription.updated` —
+  authoritative: upsert entitlement with plan, status, and `expires_at =
+  current_period_end`. Renewals roll `expires_at` forward automatically.
+- `customer.subscription.deleted` — mark entitlement `canceled`.
+
+The webhook is idempotent (keyed on subscription id) and verifies the Stripe
+signature including timestamp freshness.
 
 ### Entitlement Model
 
@@ -765,20 +786,59 @@ Current platform/API state:
 - The static build syncs pack data into `functions/_pack/catalog.json`.
 - The API shape is mostly in place, but production hardening and real-provider verification are not complete.
 
-Practical completeness estimate:
-- P0 Bootstrap Vertical Slice: 85-90%.
-- P1 MCP Internal Contract: 70-80%.
-- P2 Registry API: 60-70%.
-- P3 Auth and Payment: 35-45%.
-- P4 Update and Multi-Agent Support: 35-45%.
+Practical completeness estimate (after the 2026-06-25 hardening pass):
+- P0 Bootstrap Vertical Slice: ~95% (MCP contract smoke test added).
+- P1 MCP Internal Contract: ~90% (structured API errors, project-only scope, tested).
+- P2 Registry API: 65-75% (paid payloads kept off the npm channel; R2 storage still pending).
+- P3 Auth and Payment: 55-65% (entitlement expiry enforced, idempotent + subscription-capable webhook; real provider end-to-end still pending).
+- P4 Update and Multi-Agent Support: 45-55% (reproducible lockfile-pinned restore; multi-agent verification still pending).
+
+> 2026-06-25 hardening pass — completed and covered by tests:
+> - Paid (deluxe) skill payloads are no longer shipped in the npm tarball;
+>   `files` whitelists free skills only and `scripts/check-publish-safety.mjs`
+>   blocks any regression at publish time.
+> - Fixture mode is a free-tier sandbox on both client and server; it cannot
+>   unlock deluxe content, and production cannot enable it (host-gated).
+> - Entitlement expiry is enforced via a pure, unit-tested selector.
+> - Billing is subscription-based (Stripe `subscription` mode, monthly + annual,
+>   no trial). The webhook drives the full lifecycle (created/updated/deleted),
+>   rolls `expires_at` from `current_period_end`, is idempotent (keyed on the
+>   subscription id), and verifies signature timestamp freshness.
+> - `skill.install` is project-scoped only; the misleading `user` scope was
+>   removed from the MCP schema, manager skill, and CLI restore help.
+> - MCP API errors survive non-JSON responses and carry code + next action.
+> - `skill.restore` reproducibly pins to lockfile versions.
 
 ### 16.2 Next Work Order
 
 Do the next work in this order. The order matters because later work depends on security and scope semantics being reliable.
 
-#### Step 1: Production Safety Gate
+#### Step 0: Keep Paid Content Out of the npm Package — Done (2026-06-25)
+
+Goal: the public installer must never ship paid skill payloads. (This was the
+highest-severity gap and was not in the original list.)
+
+Done:
+- `skillflux-pack/package.json` `files` whitelists only free skill directories
+  (`skills/demo-skill`, `skills/user-story-writer`) plus `dist`, `bootstrap`,
+  `pack.json`. Deluxe `SKILL.md` payloads stay out of the tarball but remain in
+  `skillflux-pack/skills/` as the server-side registry source.
+- `scripts/check-publish-safety.mjs` runs in `prepublishOnly` and fails the
+  publish if any non-free skill is reachable by `files` (or if a broad pattern
+  like `skills`/`skills/**` reappears).
+- `pack.json` still lists deluxe **metadata** (allowed to be public per §9).
+
+Verify: `npm run check:publish` and `npm pack --dry-run` (no deluxe SKILL.md).
+
+#### Step 1: Production Safety Gate — Done (2026-06-25)
 
 Goal: make sure a production deploy cannot accidentally grant paid access.
+
+Done: `SKILLFLUX_FIXTURE_MODE` removed from `wrangler.toml` production vars;
+`functions/lib/fixture.ts` `isFixtureEnabled(env, request)` requires both the
+flag AND a non-production host, and is used by every fixture branch (auth token
+shortcut, `resolveDeviceStatus`, checkout, `/api/checkout/fixture-complete`,
+`/api/auth/callback/fixture`). Local fixture goes in git-ignored `.dev.vars`.
 
 Files to review:
 - `wrangler.toml`
@@ -805,9 +865,15 @@ npm run typecheck
 npm run build
 ```
 
-#### Step 2: Decide and Fix Install Scope Semantics
+#### Step 2: Decide and Fix Install Scope Semantics — Done (2026-06-25)
 
 Goal: make the product promise match the MCP behavior.
+
+Done: curated skills are project-scoped only. `scope` was removed from the
+`skill.install` and `skill.restore` MCP input schemas; the lockfile always
+records `scope: "project"`; the manager skill and CLI `restore` help no longer
+imply user/global skill installs. user/global scope remains only for the
+bootstrap (CLI/MCP config/manager skill).
 
 Current mismatch:
 - `skill.install` accepts `scope: "user" | "project"`.
@@ -837,9 +903,17 @@ npm test
 node dist/bin/skillflux.js restore --scope project
 ```
 
-#### Step 3: Fix Entitlement Expiry
+#### Step 3: Fix Entitlement Expiry — Done (2026-06-25)
 
 Goal: paid access should stop when a subscription entitlement expires.
+
+Done: `getActiveEntitlement` now fetches active rows and applies a pure,
+unit-tested `pickActiveEntitlement(rows, now)` selector that excludes expired
+entitlements and prefers lifetime, then newest. `expiresAtForPlan` computes
+monthly/annual expiry; the Stripe webhook records plan + `expires_at` so
+subscriptions are representable. Covered by `tests/functions-entitlement.test.ts`
+(lifetime active, subscription active before expiry, expired downgraded,
+lifetime preferred).
 
 Files to review:
 - `functions/lib/entitlements-db.ts`
@@ -864,9 +938,16 @@ npm run typecheck
 npm run build
 ```
 
-#### Step 4: Harden MCP Error Handling
+#### Step 4: Harden MCP Error Handling — Done (2026-06-25)
 
 Goal: make agent-facing failures explainable.
+
+Done: `api-client.ts` reads the response body as text first and tolerates
+non-JSON (e.g. a Cloudflare HTML error page) without a raw parse crash. Failures
+throw a `SkillFluxError` that maps HTTP status / backend code to a tool error
+code (`AUTH_REQUIRED`, `PAYMENT_REQUIRED`, `NOT_FOUND`, …), preserves a short
+body excerpt, and carries a `nextAction`. Network failures report the endpoint
+without leaking tokens.
 
 Files to review:
 - `skillflux-pack/src/mcp/api-client.ts`
@@ -891,9 +972,16 @@ npm run typecheck
 npm test
 ```
 
-#### Step 5: Add One Real MCP Smoke Test
+#### Step 5: Add One Real MCP Smoke Test — Done (2026-06-25)
 
 Goal: test the actual MCP server contract, not only service functions.
+
+Done: `skillflux-pack/tests/mcp-smoke.test.ts` drives the same server handlers
+used by stdio via an in-memory MCP client/server pair, in a temp project dir and
+fixture mode: `tools/list`, `auth.status`, `pack.search`, `skill.install`
+(demo-skill), `skill.list`, and a negative case asserting deluxe installs are
+refused with `PAYMENT_REQUIRED`. It asserts `.skillflux/installed.json` and the
+installed `SKILL.md` exist, and never touches the developer's real agent config.
 
 Required scenario:
 - Start `skillflux mcp start` in fixture mode.
@@ -913,14 +1001,20 @@ Acceptance criteria:
 
 SkillFlux is ready for a private beta only when all of these are true:
 
-- Production fixture mode is off and cannot grant paid access.
-- Project-scope skill install is the only supported concrete skill install path.
-- Entitlement expiry is enforced.
-- Cursor install path is verified on a clean temp environment.
-- `skillflux install`, `skillflux doctor`, `skillflux restore`, and `skillflux mcp start` are covered by smoke tests.
-- The website CTA points to one supported beta command and labels other agents as experimental.
-- Real payment provider is tested end-to-end in sandbox mode.
-- Real SSO provider is tested end-to-end with at least one fresh account.
+- [x] Paid skill payloads are never shipped in the npm package (guard enforced).
+- [x] Production fixture mode is off and cannot grant paid access (host-gated).
+- [x] Project-scope skill install is the only supported concrete skill install path.
+- [x] Entitlement expiry is enforced.
+- [x] `skill.restore` reproduces from the lockfile; `skill.install`/`list`/`remove`/`update` and the MCP contract are covered by smoke tests.
+- [ ] Cursor install path is verified on a clean temp environment (CLI smoke test still pending).
+- [ ] The website CTA points to one supported beta command and labels other agents as experimental.
+- [ ] Stripe subscription tested end-to-end in sandbox (subscription mode + lifecycle webhook are implemented and unit-tested; live sandbox run with real monthly/annual Price ids still pending).
+- [ ] Real SSO provider is tested end-to-end with at least one fresh account.
+
+Remaining before private beta: create the monthly + annual Stripe Prices and run
+a live sandbox subscribe/renew/cancel cycle; a CLI-level smoke test of
+`skillflux install`/`doctor` in a temp HOME (the MCP-level contract is already
+covered); a live SSO run; and the website CTA copy.
 
 ### 16.4 What Not To Build Yet
 
@@ -959,9 +1053,21 @@ Mitigation: global install only manager skill; paid skills default to project sc
 
 ### Paid Content Leakage
 
-Risk: paid skill payload accidentally shipped in public static site.
+Risk: paid skill payload accidentally shipped through a public channel. Two
+channels matter, not just the static site:
+1. The Astro static assets on skillflux.cn.
+2. **The public npm package** — `files` whitelisting the whole `skills/` tree
+   would ship deluxe `SKILL.md` payloads to anyone who runs `npm pack skillflux`.
 
-Mitigation: keep paid content in private repo/R2/server bundle; never expose in Astro static assets.
+Mitigation:
+- Keep paid payloads out of static assets (server-side `functions/_pack/` only).
+- npm `files` whitelists individual **free** skill directories only; deluxe
+  payloads are never bundled. Enforced by `scripts/check-publish-safety.mjs`
+  in `prepublishOnly`, which fails the publish if any non-free skill would be
+  included.
+- Fixture mode is treated as a free-tier sandbox: it can install free skills
+  offline but refuses deluxe payloads (which only the authorized registry
+  serves after an entitlement check).
 
 ### Local File Overwrite
 
@@ -977,9 +1083,9 @@ Mitigation: lockfile hash check and conflict status.
 2. Project skill 目录：统一用 `<project>/.skillflux/skills/`，还是同步到各 agent 原生 project skills 目录？
 3. `skillflux.json` 是否提交到 git：建议提交；`.skillflux/skills` 是否 gitignore：建议默认 gitignore。
 4. Auth provider：GitHub OAuth、Google OAuth、邮箱 magic link，还是托管 auth。
-5. Payment provider：Stripe、Lemon Squeezy、Polar，先选一个。
-6. Pricing：一次买断、年度订阅、还是买断 + 维护订阅。
-7. Free demo：未购买用户能否安装 1 个 demo/free skill。
+5. Payment provider：~~Stripe、Lemon Squeezy、Polar~~ → **已定：Stripe**（subscription 模式）。
+6. Pricing：~~一次买断、年度订阅、还是买断 + 维护订阅~~ → **已定：订阅制，提供 monthly + annual 两档，无试用**。
+7. Free demo：未购买用户能否安装 1 个 demo/free skill。（当前 free tier skills 已可免费安装。）
 
 ---
 

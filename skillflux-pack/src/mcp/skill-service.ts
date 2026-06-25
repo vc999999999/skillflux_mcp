@@ -39,9 +39,13 @@ interface InstallSkillData {
   files: string[];
 }
 
-function resolveScope(scope?: InstallScope): InstallScope {
-  return scope ?? "project";
+interface InstallSkillOptions {
+  /** Pin to an exact catalog version (used by update + reproducible restore). */
+  version?: string;
 }
+
+/** Curated skills are always installed at project scope; see PRD §6 / §16.2. */
+const SKILL_INSTALL_SCOPE: InstallScope = "project";
 
 async function requireCatalogAuth(): Promise<void> {
   const auth = await resolveAuthStatus();
@@ -55,6 +59,19 @@ async function requireCatalogAuth(): Promise<void> {
 }
 
 async function requireSkillAuth(tier: string): Promise<void> {
+  if (isFixtureMode()) {
+    // Fixture mode is a local free-tier sandbox for the P0 smoke flow. It can
+    // install free skills without an API, but must never unlock paid (deluxe)
+    // payloads — those are not bundled and require the live registry + purchase.
+    if (tier !== "free") {
+      throw authError(
+        "needs_payment",
+        "Fixture mode only includes free skills. Deluxe skills require the live registry (set SKILLFLUX_API_URL) and a completed purchase.",
+      );
+    }
+    return;
+  }
+
   const auth = await resolveAuthStatus();
   if (
     auth.status === "unauthenticated" ||
@@ -115,15 +132,14 @@ function computeInstalledHash(
 
 export async function installSkill(
   id: string,
-  scope?: InstallScope,
+  options: InstallSkillOptions = {},
   cwd = process.cwd(),
 ): Promise<ToolResult<InstallSkillData>> {
   await requireSkillAuth(await resolveSkillTier(id));
 
-  const payload = await loadSkillPayload(id);
+  const payload = await loadSkillPayload(id, options.version);
   verifySkillPayload(payload);
 
-  const installScope = resolveScope(scope);
   const projectRoot = getProjectRoot(cwd);
   const targetDir = projectSkillDir(id, cwd);
   const relativeSkillPath = join(PROJECT_SKILLS_DIR, id).split("\\").join("/");
@@ -135,7 +151,7 @@ export async function installSkill(
     id,
     {
       version: payload.version,
-      scope: installScope,
+      scope: SKILL_INSTALL_SCOPE,
       path: relativeSkillPath,
       sha256: payload.sha256,
       files: relativeFiles,
@@ -148,7 +164,7 @@ export async function installSkill(
     {
       id,
       version: payload.version,
-      scope: installScope,
+      scope: SKILL_INSTALL_SCOPE,
       path: toProjectRelativePath(targetDir, cwd),
       manifestPath: toProjectRelativePath(join(projectRoot, "skillflux.json"), cwd),
       lockfilePath: toProjectRelativePath(join(projectRoot, ".skillflux", "installed.json"), cwd),
@@ -191,7 +207,7 @@ export async function updateSkills(
       continue;
     }
 
-    const result = await installSkill(skillId, installed.scope, cwd);
+    const result = await installSkill(skillId, { version: remote.version }, cwd);
     if (!result.ok) return result;
 
     updates.push({
@@ -348,7 +364,7 @@ interface RestoreFailure {
 }
 
 export async function restoreProjectSkills(
-  scope?: InstallScope,
+  _scope?: InstallScope,
   cwd = process.cwd(),
 ): Promise<
   ToolResult<{
@@ -358,7 +374,10 @@ export async function restoreProjectSkills(
 > {
   await requireCatalogAuth();
 
+  // skillflux.json declares intent; the committed lockfile (installed.json)
+  // pins exact versions so a clone restores reproducibly instead of "latest".
   const manifest = await readProjectManifest(cwd);
+  const lockfile = await readLockfile(cwd);
   const ids = Object.keys(manifest.skills);
   if (ids.length === 0) {
     return okResult(
@@ -373,7 +392,8 @@ export async function restoreProjectSkills(
 
   for (const id of ids) {
     try {
-      const result = await installSkill(id, scope, cwd);
+      const pinnedVersion = lockfile.skills[id]?.version;
+      const result = await installSkill(id, { version: pinnedVersion }, cwd);
       if (result.ok) {
         restored.push({
           id,

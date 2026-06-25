@@ -7,7 +7,9 @@ interface Env {
   GITHUB_CLIENT_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
-  STRIPE_PRICE_ID?: string;
+  STRIPE_PRICE_ID?: string; // legacy single price; prefer the per-plan ids below
+  STRIPE_PRICE_MONTHLY?: string;
+  STRIPE_PRICE_ANNUAL?: string;
   SKILLFLUX_PRODUCT?: string;
 }
 

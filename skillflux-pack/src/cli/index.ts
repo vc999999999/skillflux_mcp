@@ -51,14 +51,11 @@ export async function runCli(argv: string[]): Promise<void> {
 
   program
     .command("restore")
-    .description("Install all skills declared in ./skillflux.json")
-    .option(
-      "--scope <scope>",
-      "Install scope: user | project (default project)",
-      parseScope,
+    .description(
+      "Reproducibly install all skills declared in ./skillflux.json (project-scoped, pinned to ./.skillflux/installed.json when present)",
     )
-    .action(async (options: { scope?: InstallScope }) => {
-      const notes = await runRestore({ scope: options.scope });
+    .action(async () => {
+      const notes = await runRestore();
       for (const note of notes) {
         console.log(note);
       }

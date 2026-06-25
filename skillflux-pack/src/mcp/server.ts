@@ -46,7 +46,7 @@ function wrapError(error: unknown) {
   );
 }
 
-export async function startMcpServer(): Promise<void> {
+export function createMcpServer(): Server {
   const server = new Server(
     { name: "skillflux-mcp", version: "0.1.0" },
     { capabilities: { tools: {} } },
@@ -67,11 +67,17 @@ export async function startMcpServer(): Promise<void> {
       },
       {
         name: "billing.checkout",
-        description: "Create a hosted checkout session for SkillFlux marketplace purchase.",
+        description:
+          "Create a hosted subscription checkout session for SkillFlux. Ask the user whether they want the monthly or annual plan.",
         inputSchema: {
           type: "object",
           properties: {
             product: { type: "string", description: "Product id, default deluxe-pack" },
+            plan: {
+              type: "string",
+              enum: ["monthly", "annual"],
+              description: "Subscription billing period (default monthly)",
+            },
           },
         },
       },
@@ -98,12 +104,11 @@ export async function startMcpServer(): Promise<void> {
       {
         name: "skill.install",
         description:
-          "Download and enable a skill in the current project (.skillflux/skills/). Defaults to project scope.",
+          "Download and enable a curated skill in the current project (.skillflux/skills/). Curated skills are always project-scoped; global/user scope is reserved for the SkillFlux bootstrap only.",
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string" },
-            scope: { type: "string", enum: ["user", "project"] },
           },
           required: ["id"],
         },
@@ -136,13 +141,9 @@ export async function startMcpServer(): Promise<void> {
       },
       {
         name: "skill.restore",
-        description: "Install all skills declared in the current project's skillflux.json.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            scope: { type: "string", enum: ["user", "project"] },
-          },
-        },
+        description:
+          "Reproducibly install all skills declared in the current project's skillflux.json, pinned to the lockfile (installed.json) versions when present. Always project-scoped.",
+        inputSchema: { type: "object", properties: {} },
       },
       {
         name: "doctor",
@@ -170,10 +171,19 @@ export async function startMcpServer(): Promise<void> {
           );
         }
         case "billing.checkout": {
-          const parsed = z.object({ product: z.string().optional() }).parse(args ?? {});
-          const checkout = await beginCheckout(parsed.product);
+          const parsed = z
+            .object({
+              product: z.string().optional(),
+              plan: z.enum(["monthly", "annual"]).optional(),
+            })
+            .parse(args ?? {});
+          const plan = parsed.plan ?? "monthly";
+          const checkout = await beginCheckout(parsed.product, plan);
           return textResult(
-            okResult(checkout, "Open the checkout URL in your browser to complete purchase."),
+            okResult(
+              checkout,
+              `Open the checkout URL in your browser to start the ${plan} subscription.`,
+            ),
           );
         }
         case "pack.search": {
@@ -187,13 +197,8 @@ export async function startMcpServer(): Promise<void> {
           return textResult(await getPackSkillInfo(parsed.id));
         }
         case "skill.install": {
-          const parsed = z
-            .object({
-              id: z.string(),
-              scope: z.enum(["user", "project"]).optional(),
-            })
-            .parse(args ?? {});
-          return textResult(await installSkill(parsed.id, parsed.scope));
+          const parsed = z.object({ id: z.string() }).parse(args ?? {});
+          return textResult(await installSkill(parsed.id));
         }
         case "skill.update": {
           const parsed = z
@@ -207,12 +212,8 @@ export async function startMcpServer(): Promise<void> {
           const parsed = z.object({ id: z.string() }).parse(args ?? {});
           return textResult(await removeSkill(parsed.id));
         }
-        case "skill.restore": {
-          const parsed = z
-            .object({ scope: z.enum(["user", "project"]).optional() })
-            .parse(args ?? {});
-          return textResult(await restoreProjectSkills(parsed.scope));
-        }
+        case "skill.restore":
+          return textResult(await restoreProjectSkills());
         case "doctor":
           return textResult(await runMcpDoctor());
         default:
@@ -223,6 +224,11 @@ export async function startMcpServer(): Promise<void> {
     }
   });
 
+  return server;
+}
+
+export async function startMcpServer(): Promise<void> {
+  const server = createMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

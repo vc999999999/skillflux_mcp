@@ -3,7 +3,7 @@
 - 状态：草稿 v0.3
 - 日期：2026-06-25
 - 读者：构建本产品的开发者（你）
-- 关联：本仓库是引流站（skillflux.cn），`skillflux-pack/` 是 Bootstrap Kit 与 P0 实现目录
+- 关联：独立仓库 [skillflux_mcp](https://github.com/vc999999999/skillflux_mcp)；引流站 [Skillflux_Cloudflare](https://github.com/vc999999999/Skillflux_Cloudflare) 仅负责 skillflux.cn 内容分发
 
 ---
 

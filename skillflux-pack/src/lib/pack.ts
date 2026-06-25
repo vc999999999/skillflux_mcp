@@ -15,6 +15,9 @@ export interface PackSkill {
   path: string;
   tier: string;
   sha256: string;
+  /** Set when the skill is adapted from third-party content (attribution). */
+  license?: string;
+  author?: string;
 }
 
 export interface PackManifest {

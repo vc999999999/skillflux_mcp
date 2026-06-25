@@ -160,7 +160,7 @@ describe("pack manifest", () => {
   it("loads bundled pack.json", async () => {
     const manifest = await loadPackManifest();
     expect(manifest.name).toBe("skillflux/deluxe-pack");
-    expect(manifest.skills.length).toBe(5);
+    expect(manifest.skills.length).toBe(6);
   });
 
   it("filters skills by query", async () => {

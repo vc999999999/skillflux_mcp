@@ -62,6 +62,19 @@
       "path": "skills/code-review-zh",
       "tier": "deluxe",
       "sha256": "add6ecabdc2a1e0da64245ef3b1b186c04f38474639e871292334cf843a9a519"
+    },
+    {
+      "id": "springboot-code-reviewer",
+      "name": "Spring Boot 4 / Java 25 Code Reviewer",
+      "description": "Structured review of Java 25 + Spring Boot 4 code, PRs, and modules: migration leftovers, architecture boundary violations, JSpecify null-safety, Spring Data N+1, security, and performance. Cites file:line; needs concrete code context.",
+      "category": "dev",
+      "version": "1.0.0",
+      "origin": "rewrite",
+      "license": "MIT",
+      "author": "a-pavithraa (Pavithra)",
+      "path": "skills/springboot-code-reviewer",
+      "tier": "deluxe",
+      "sha256": "d6d1f69645db532cdfae134f9e8efd8c3a0db4e9d8113e31624c0e09eeb4a274"
     }
   ]
 }

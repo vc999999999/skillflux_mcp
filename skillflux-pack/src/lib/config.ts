@@ -64,5 +64,8 @@ export function isFixtureMode(): boolean {
 }
 
 export function apiBaseUrl(): string {
-  return (process.env.SKILLFLUX_API_URL ?? "https://skillflux.cn/api").replace(/\/$/, "");
+  // Default registry endpoint. skillflux.cn is the marketing site, so the API
+  // lives on its own host. Override with SKILLFLUX_API_URL for local/dev or a
+  // future custom domain (e.g. https://api.skillflux.cn/api).
+  return (process.env.SKILLFLUX_API_URL ?? "https://skillflux-mcp.pages.dev/api").replace(/\/$/, "");
 }

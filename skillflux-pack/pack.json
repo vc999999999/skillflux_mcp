@@ -1,7 +1,7 @@
 {
   "name": "skillflux/deluxe-pack",
   "packVersion": "0.2.0",
-  "updatedAt": "2026-06-25",
+  "updatedAt": "2026-06-26",
   "agents": [
     "cursor",
     "claude-code",
